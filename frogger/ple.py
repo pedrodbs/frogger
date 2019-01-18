@@ -74,8 +74,8 @@ class Frogger(PyGameWrapper):
         self.sound = sound
 
         self.key_pressed = 0
+        self.process_events = False
         self.game_init = False
-        self.step_reward = 0.
 
         self.frog = Frog(FROG_INIT_POS.copy(), None, self.init_lives, {})
         self.game = Game(self.init_speed, self.init_level, self.max_steps)
@@ -105,7 +105,7 @@ class Frogger(PyGameWrapper):
         self._init_resources()
 
         self.key_pressed = 0
-        self.step_reward = 0.
+        self.process_events = False
 
         self.cars = []
         self.logs = []
@@ -124,25 +124,28 @@ class Frogger(PyGameWrapper):
 
     def step(self, dt):
 
-        self.step_reward = 0.
-
         # checks 'wait for key' state
         if not self.frog.is_moving:
             self.key_pressed = 0
 
         # processes events
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                exit()
-            if event.type == KEYDOWN and not self.frog.is_moving:
-                # sets new direction and locks frog movement
-                self.key_pressed = event.key
-                self.frog.update_sprite(self.key_pressed)
-                self.frog.is_moving = True
+        if self.process_events:
+            self.process_events = False
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    exit()
+                if event.type == KEYDOWN and not self.frog.is_moving:
+                    # sets new direction and locks frog movement
+                    self.key_pressed = event.key
+                    self.frog.update_sprite(self.key_pressed)
+                    self.frog.is_moving = True
+
+        # refreshes screen if needed
+        pygame.event.pump()
 
         # checks max moves
         if self.game.steps == 0:
-            self.step_reward += self.rewards[TIME_UP_RWD_ATTR]
+            self.game.points += self.rewards[TIME_UP_RWD_ATTR]
             self.frog.set_dead(self.game)
 
         self._create_cars()
@@ -166,8 +169,6 @@ class Frogger(PyGameWrapper):
 
         self._check_frog_location()
         self._check_next_level()
-
-        self.game.points += self.step_reward
 
         # show stats
         if self.show_stats:
@@ -210,6 +211,7 @@ class Frogger(PyGameWrapper):
 
     def _setAction(self, action, last_action):
         super()._setAction(action, last_action)
+        self.process_events = True
         self.game.steps -= 1
         self.game.points += self.rewards[TICK_RWD_ATTR]
 
@@ -340,7 +342,7 @@ class Frogger(PyGameWrapper):
                 if self.sound:
                     self.hit_sound.play()
                 self.frog.set_dead(self.game)
-                self.step_reward += self.rewards[HIT_CAR_RWD_ATTR]
+                self.game.points += self.rewards[HIT_CAR_RWD_ATTR]
                 break
 
     def _frog_in_the_lake(self):
@@ -358,7 +360,7 @@ class Frogger(PyGameWrapper):
             if self.sound:
                 self.water_sound.play()
             self.frog.set_dead(self.game)
-            self.step_reward += self.rewards[HIT_WATER_RWD_ATTR]
+            self.game.points += self.rewards[HIT_WATER_RWD_ATTR]
 
         else:
             if log_dir == 'right':
@@ -417,7 +419,7 @@ class Frogger(PyGameWrapper):
         self.frog.set_to_initial_position()
         self.frog.animation_counter = 0
         self.frog.is_moving = False
-        self.step_reward += self.game.level * self.rewards[FROG_ARRIVED_RWD_ATTR]
+        self.game.points += self.game.level * self.rewards[FROG_ARRIVED_RWD_ATTR]
 
     def _check_next_level(self):
         if len(self.arrived_frogs) < self.num_arrived_frogs:
@@ -427,7 +429,7 @@ class Frogger(PyGameWrapper):
         self.frog.set_to_initial_position()
         self.game.level += 1
         self.game.speed += 1
-        self.step_reward += self.game.level * self.rewards[NEW_LEVEL_RWD_ATTR]
+        self.game.points += self.game.level * self.rewards[NEW_LEVEL_RWD_ATTR]
 
 
 class Object(object):

@@ -44,11 +44,11 @@ class FroggerEnv(Env):
     def __init__(self, fps=30, display_screen=True, add_noop_action=False, actions=None, rewards=None,
                  lives=3, speed=3, level=1, num_arrived_frogs=5, max_steps=1000, force_fps=False,
                  show_stats=True, sound=True):
-
         self.metadata['video.frames_per_second'] = fps
 
-        # set headless mode
-        os.environ['SDL_VIDEODRIVER'] = 'dummy'
+        # set headless mode if not displaying to screen
+        if not display_screen:
+            os.environ['SDL_VIDEODRIVER'] = 'dummy'
 
         # open up a game state to communicate with emulator
         game = Frogger(actions=actions, rewards=rewards, lives=lives, speed=speed, level=level,
@@ -56,7 +56,7 @@ class FroggerEnv(Env):
                        show_stats=show_stats, sound=sound)
 
         self.game_state = PLE(game, fps=fps, display_screen=display_screen, force_fps=not force_fps,
-                              num_steps=ANIMATIONS_PER_MOVE, add_noop_action=add_noop_action)
+                              add_noop_action=add_noop_action)
         self.game_state.init()
 
         self._action_set = self.game_state.getActionSet()
@@ -68,43 +68,62 @@ class FroggerEnv(Env):
         self.observation_space = \
             spaces.Box(low=0, high=255, shape=self.game_state.game.getGameState().shape, dtype=np.uint8)
 
-        self.viewer = None
+        self.previous_score = 0.
+        self.last_action = None
+        self.monitor = None
 
     def step(self, a):
-        reward = self.game_state.act(None if a is None else self._action_set[a])
-        state = self.game_state.game.getGameState()
+
+        action = None if a is None else self._action_set[a]
+        reward = 0.
         terminal = self.game_state.game_over()
+
+        if not terminal:
+
+            # sets action, activating necessary keys for PyGame
+            self._set_action(action)
+
+            # performs several updates to the game per action (move)
+            for i in range(ANIMATIONS_PER_MOVE):
+                self.game_state.game.tick(self.game_state.fps)
+                self.game_state.game.step(0)
+                self.game_state._draw_frame()
+
+                # trick to update external Gym Monitor (frames within action) if one was provided
+                if self.monitor is not None and i < ANIMATIONS_PER_MOVE - 1:
+                    self.monitor.video_recorder.capture_frame()
+
+            # gets total reward collected by this action
+            reward = self._get_reward()
+
+        state = self.game_state.game.getGameState()
 
         return state, reward, terminal, {}
 
     def reset(self):
+        self.previous_score = 0.
+        self.last_action = None
         self.game_state.reset_game()
         return self.game_state.game.getGameState()
 
     def render(self, mode='human', close=False):
-        if close:
-            if self.viewer is not None:
-                self.viewer.close()
-                self.viewer = None
-            return
-        img = self._get_image()
-        if mode == 'rgb_array':
-            return img
-        elif mode == 'human':
-            from gym.envs.classic_control import rendering
-            if self.viewer is None:
-                self.viewer = rendering.SimpleImageViewer()
-                self.viewer.imshow(img)
-
-                # also set window size
-                self.viewer.window.set_size(self.screen_width, self.screen_height)
-            else:
-                self.viewer.imshow(img)
+        return self._get_image()
 
     def seed(self, seed=None):
         rng = self.game_state.rng = self.game_state.game.rng = np.random.RandomState(0 if seed is None else seed)
         self.game_state.init()
         return rng
+
+    def _get_reward(self):
+        cur_score = self.game_state.score()
+        reward = cur_score - self.previous_score
+        self.previous_score = cur_score
+        return reward
+
+    def _set_action(self, action):
+        if action is not None:
+            self.game_state.game._setAction(action, self.last_action)
+        self.last_action = action
 
     def _get_image(self):
         image_rotated = np.fliplr(
