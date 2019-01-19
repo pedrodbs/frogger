@@ -6,8 +6,8 @@ from os import makedirs
 from os.path import exists
 from collections import OrderedDict
 from gym.wrappers import Monitor
-from frogger import FroggerState, CELL_WIDTH, CELL_HEIGHT
-from frogger.ple import ACTION_LEFT_KEY, ACTION_RIGHT_KEY, ACTION_UP_KEY, ACTION_DOWN_KEY
+from frogger import FroggerState, CELL_WIDTH, CELL_HEIGHT, ACTION_LEFT_KEY, ACTION_RIGHT_KEY, ACTION_UP_KEY, \
+    ACTION_DOWN_KEY
 from frogger.gym import *
 
 GAME_GYM_ID = 'Frogger-Custom-v0'
@@ -95,9 +95,9 @@ if __name__ == '__main__':
 
             clean_console()
             state = FroggerState.from_observation(obs)
-            x = (state.frog_position[0] - 2) / CELL_WIDTH
-            y = (state.frog_position[1] - 46) / CELL_HEIGHT
-            print('frog pos: ({},{})'.format(state.frog_position[0], state.frog_position[1]))
+            x = (state.frog_rec[0] - 2) / CELL_WIDTH
+            y = (state.frog_rec[1] - 46) / CELL_HEIGHT
+            print('frog pos: ({},{})'.format(state.frog_rec[0], state.frog_rec[1]))
             print('frog cell: ({},{})'.format(x, y))
 
             total_reward += rwd

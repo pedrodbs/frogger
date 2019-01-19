@@ -97,6 +97,7 @@ class FroggerEnv(Env):
             reward = self._get_reward()
 
         state = self.game_state.game.getGameState()
+        terminal = self.game_state.game_over()
 
         return state, reward, terminal, {}
 

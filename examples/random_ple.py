@@ -3,8 +3,8 @@ __author__ = 'Pedro Sequeira'
 import os
 import numpy as np
 from ple import PLE
-from frogger import FroggerState, CELL_WIDTH, CELL_HEIGHT
-from frogger.ple import Frogger, ANIMATIONS_PER_MOVE
+from frogger import FroggerState, ANIMATIONS_PER_MOVE, CELL_WIDTH, CELL_HEIGHT
+from frogger.ple import Frogger
 
 
 def clean_console():
@@ -32,8 +32,8 @@ if __name__ == '__main__':
 
             clean_console()
             state = FroggerState.from_observation(obs)
-            x = (state.frog_position[0] - 2) / CELL_WIDTH
-            y = (state.frog_position[1] - 46) / CELL_HEIGHT
+            x = (state.frog_rec[0] - 2) / CELL_WIDTH
+            y = (state.frog_rec[1] - 46) / CELL_HEIGHT
             print('action: ', action_names[action_set.index(action)])
             print('frog cell: ({},{})'.format(x, y))
 

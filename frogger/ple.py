@@ -1,33 +1,13 @@
 __author__ = 'Pedro Sequeira'
 
 import pygame
-import numpy as np
 from collections import OrderedDict
 from sys import exit
-from pygame.constants import K_UP, K_DOWN, K_LEFT, K_RIGHT, QUIT, KEYDOWN
+from os.path import dirname, abspath, join
+from pygame.constants import QUIT, KEYDOWN
 from ple.games.base import PyGameWrapper
 from pygame.rect import Rect
-from frogger import OBS_SEPARATOR
-
-# constants
-HEIGHT = 546
-WIDTH = 448
-FROG_INIT_POS = [207, 475]
-MAX_CAR_TICKS = 60
-MAX_LOG_TICK = 30
-ACTION_UP_KEY = K_UP
-ACTION_DOWN_KEY = K_DOWN
-ACTION_LEFT_KEY = K_LEFT
-ACTION_RIGHT_KEY = K_RIGHT
-ANIMATIONS_PER_MOVE = 4
-TXT_COLOR = 220
-
-HIT_CAR_RWD_ATTR = 'hit-car-rwd'
-HIT_WATER_RWD_ATTR = 'water-rwd'
-TIME_UP_RWD_ATTR = 'time-up-rwd'
-NEW_LEVEL_RWD_ATTR = 'level-rwd'
-FROG_ARRIVED_RWD_ATTR = 'frog-arrived-rwd'
-TICK_RWD_ATTR = 'tick-rwd'
+from frogger import *
 
 
 # functions
@@ -43,7 +23,7 @@ def move_list(lst, speed):
 
 class Frogger(PyGameWrapper):
     def __init__(self, actions=None, rewards=None, lives=3, speed=3, level=1,
-                 num_arrived_frogs=5, max_steps=300, show_stats=True, sound=True):
+                 num_arrived_frogs=5, max_steps=60, show_stats=True, sound=True):
 
         if actions is None:
             actions = OrderedDict([
@@ -59,6 +39,7 @@ class Frogger(PyGameWrapper):
                 HIT_CAR_RWD_ATTR: -20.,
                 HIT_WATER_RWD_ATTR: -20.,
                 TIME_UP_RWD_ATTR: -20.,
+                NO_LIVES_RWD_ATTR: -50,
                 NEW_LEVEL_RWD_ATTR: 100.,
                 FROG_ARRIVED_RWD_ATTR: 30.,
                 TICK_RWD_ATTR: -1.
@@ -124,6 +105,10 @@ class Frogger(PyGameWrapper):
 
     def step(self, dt):
 
+        # ignore if game is over, needs re-init
+        if self.game_over():
+            return
+
         # checks 'wait for key' state
         if not self.frog.is_moving:
             self.key_pressed = 0
@@ -145,8 +130,8 @@ class Frogger(PyGameWrapper):
 
         # checks max moves
         if self.game.steps == 0:
-            self.game.points += self.rewards[TIME_UP_RWD_ATTR]
-            self.frog.set_dead(self.game)
+            self.game.points += self._get_reward(TIME_UP_RWD_ATTR)
+            self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
 
         self._create_cars()
         self._create_logs()
@@ -187,33 +172,25 @@ class Frogger(PyGameWrapper):
             self.screen.blit(text_info4, (370, 520))
 
     def getGameState(self):
-        # add game stats and frog info
-        obs_list = [self.game.steps,
-                    self.game.level,
-                    self.game.points,
-                    len(self.arrived_frogs),
-                    self.frog.lives,
-                    self.frog.position[0],
-                    self.frog.position[1]]
-
-        # adds cars infos
-        for elem in self.cars:
-            obs_list.append(elem.position[0])
-            obs_list.append(elem.position[1])
-
-        # puts separator before logs infos
-        obs_list.append(OBS_SEPARATOR)
-        for elem in self.logs:
-            obs_list.append(elem.position[0])
-            obs_list.append(elem.position[1])
-
-        return np.array(obs_list)
+        return FroggerState.from_game(
+            self.game, self.arrived_frogs, self.frog, self.cars, self.logs).to_observation()
 
     def _setAction(self, action, last_action):
         super()._setAction(action, last_action)
         self.process_events = True
         self.game.steps -= 1
-        self.game.points += self.rewards[TICK_RWD_ATTR]
+        self.game.points += self._get_reward(TICK_RWD_ATTR)
+
+    def _get_reward(self, rwd_attr):
+        return self.rewards[rwd_attr] if rwd_attr in self.rewards else 0.
+
+    @staticmethod
+    def _load_img(base_dir, img_path):
+        return pygame.image.load(join(base_dir, img_path))
+
+    @staticmethod
+    def _load_sound(base_dir, sound_path):
+        return pygame.mixer.Sound(join(base_dir, sound_path))
 
     def _init_resources(self):
         if self.game_init:
@@ -225,34 +202,37 @@ class Frogger(PyGameWrapper):
         self.info_font = pygame.font.SysFont(font_name, 24)
         self.menu_font = pygame.font.SysFont(font_name, 36)
 
+        # to allow running game from any script
+        _dir = dirname(abspath(join(__file__, '..')))
+
         # sprites
-        self.background = pygame.image.load('./images/bg.png').convert()
-        sprite_frog_up = pygame.image.load('./images/sprite_sheets_up.png').convert_alpha()
-        sprite_frog_down = pygame.image.load('./images/sprite_sheets_down.png').convert_alpha()
-        sprite_frog_left = pygame.image.load('./images/sprite_sheets_left.png').convert_alpha()
-        sprite_frog_right = pygame.image.load('./images/sprite_sheets_right.png').convert_alpha()
+        self.background = self._load_img(_dir, 'images/bg.png').convert()
+        sprite_frog_up = self._load_img(_dir, 'images/sprite_sheets_up.png').convert_alpha()
+        sprite_frog_down = self._load_img(_dir, 'images/sprite_sheets_down.png').convert_alpha()
+        sprite_frog_left = self._load_img(_dir, 'images/sprite_sheets_left.png').convert_alpha()
+        sprite_frog_right = self._load_img(_dir, 'images/sprite_sheets_right.png').convert_alpha()
         self.frog_sprites = {ACTION_UP_KEY: sprite_frog_up,
                              ACTION_DOWN_KEY: sprite_frog_down,
                              ACTION_LEFT_KEY: sprite_frog_left,
                              ACTION_RIGHT_KEY: sprite_frog_right}
 
-        self.sprite_arrived = pygame.image.load('./images/frog_arrived.png').convert_alpha()
+        self.sprite_arrived = self._load_img(_dir, 'images/frog_arrived.png').convert_alpha()
 
-        sprite_car1 = pygame.image.load('./images/car1.png').convert_alpha()
-        sprite_car2 = pygame.image.load('./images/car2.png').convert_alpha()
-        sprite_car3 = pygame.image.load('./images/car3.png').convert_alpha()
-        sprite_car4 = pygame.image.load('./images/car4.png').convert_alpha()
-        sprite_car5 = pygame.image.load('./images/car5.png').convert_alpha()
+        sprite_car1 = self._load_img(_dir, 'images/car1.png').convert_alpha()
+        sprite_car2 = self._load_img(_dir, 'images/car2.png').convert_alpha()
+        sprite_car3 = self._load_img(_dir, 'images/car3.png').convert_alpha()
+        sprite_car4 = self._load_img(_dir, 'images/car4.png').convert_alpha()
+        sprite_car5 = self._load_img(_dir, 'images/car5.png').convert_alpha()
         self.car_sprites = [sprite_car1, sprite_car2, sprite_car3, sprite_car4, sprite_car5]
 
-        self.log_sprite = pygame.image.load('./images/tronco.png').convert_alpha()
+        self.log_sprite = self._load_img(_dir, 'images/tronco.png').convert_alpha()
 
         # sound effects
         if self.sound:
-            self.hit_sound = pygame.mixer.Sound('./sounds/boom.wav')
-            self.water_sound = pygame.mixer.Sound('./sounds/agua.wav')
-            self.arrived_sound = pygame.mixer.Sound('./sounds/success.wav')
-            pygame.mixer.Sound('./sounds/guimo.wav').play(-1)
+            self.hit_sound = self._load_sound(_dir, 'sounds/boom.wav')
+            self.water_sound = self._load_sound(_dir, 'sounds/agua.wav')
+            self.arrived_sound = self._load_sound(_dir, 'sounds/success.wav')
+            self._load_sound(_dir, 'sounds/guimo.wav').play(-1)
 
         pygame.display.set_caption('Frogger')
 
@@ -341,8 +321,8 @@ class Frogger(PyGameWrapper):
             if frog_rect.colliderect(car_rect):
                 if self.sound:
                     self.hit_sound.play()
-                self.frog.set_dead(self.game)
-                self.game.points += self.rewards[HIT_CAR_RWD_ATTR]
+                self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
+                self.game.points += self._get_reward(HIT_CAR_RWD_ATTR)
                 break
 
     def _frog_in_the_lake(self):
@@ -359,8 +339,8 @@ class Frogger(PyGameWrapper):
         if not safe:
             if self.sound:
                 self.water_sound.play()
-            self.frog.set_dead(self.game)
-            self.game.points += self.rewards[HIT_WATER_RWD_ATTR]
+            self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
+            self.game.points += self._get_reward(HIT_WATER_RWD_ATTR)
 
         else:
             if log_dir == 'right':
@@ -373,29 +353,18 @@ class Frogger(PyGameWrapper):
         return any([fg.position == position for fg in self.arrived_frogs])
 
     def _check_frog_arrived(self):
-        if 33 < self.frog.position[0] < 53 and not self._occupied([43, 7]):
-            position_init = [43, 7]
-            self._create_arrived(position_init)
 
-        elif 115 < self.frog.position[0] < 135 and not self._occupied([125, 7]):
-            position_init = [125, 7]
-            self._create_arrived(position_init)
+        # checks if frog jumps to any lily pad
+        for arrival_x in ARRIVAL_POSITIONS:
+            arrive_pos = [arrival_x, 7]
+            if arrival_x - 10 < self.frog.position[0] < arrival_x + 10 and not self._occupied(arrive_pos):
+                self._create_arrived(arrive_pos)
+                return
 
-        elif 197 < self.frog.position[0] < 217 and not self._occupied([207, 7]):
-            position_init = [207, 7]
-            self._create_arrived(position_init)
-
-        elif 279 < self.frog.position[0] < 299 and not self._occupied([289, 7]):
-            position_init = [289, 7]
-            self._create_arrived(position_init)
-
-        elif 361 < self.frog.position[0] < 381 and not self._occupied([371, 7]):
-            position_init = [371, 7]
-            self._create_arrived(position_init)
-        else:
-            self.frog.position[1] = 46
-            self.frog.animation_counter = 0
-            self.frog.is_moving = False
+        # otherwise put's frog back in log
+        self.frog.position[1] = 46
+        self.frog.animation_counter = 0
+        self.frog.is_moving = False
 
     def _check_frog_location(self):
         # if frog is crossing the road
@@ -419,7 +388,7 @@ class Frogger(PyGameWrapper):
         self.frog.set_to_initial_position()
         self.frog.animation_counter = 0
         self.frog.is_moving = False
-        self.game.points += self.game.level * self.rewards[FROG_ARRIVED_RWD_ATTR]
+        self.game.points += self.game.level * self._get_reward(FROG_ARRIVED_RWD_ATTR)
 
     def _check_next_level(self):
         if len(self.arrived_frogs) < self.num_arrived_frogs:
@@ -427,9 +396,10 @@ class Frogger(PyGameWrapper):
 
         self.arrived_frogs = []
         self.frog.set_to_initial_position()
+        self.game.reset_steps()
         self.game.level += 1
         self.game.speed += 1
-        self.game.points += self.game.level * self.rewards[NEW_LEVEL_RWD_ATTR]
+        self.game.points += self.game.level * self._get_reward(NEW_LEVEL_RWD_ATTR)
 
 
 class Object(object):
@@ -486,10 +456,17 @@ class Frog(Object):
             self.animation_counter = 0
             self.is_moving = False
 
-    def set_dead(self, game):
+    def set_dead(self, game, no_lives_rwd):
+        self.lives -= 1
+
+        # checks no more lives, adds reward
+        if self.lives == 0:
+            game.points += no_lives_rwd
+            return
+
+        # otherwise reset frog
         game.reset_steps()
         self.set_to_initial_position()
-        self.lives -= 1
         self.animation_counter = 0
         self.is_moving = False
         self.update_sprite(ACTION_UP_KEY)

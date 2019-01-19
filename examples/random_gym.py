@@ -4,8 +4,8 @@ import gym
 from gym.wrappers import Monitor
 from os import makedirs
 from os.path import exists
-from frogger.gym import *
 from frogger import FroggerState, CELL_WIDTH, CELL_HEIGHT
+from frogger.gym import *
 
 GYM_ENV_ID = 'Custom-Frogger-v0'
 
@@ -53,8 +53,8 @@ if __name__ == '__main__':
 
             clean_console()
             state = FroggerState.from_observation(obs)
-            x = (state.frog_position[0] - 2) / CELL_WIDTH
-            y = (state.frog_position[1] - 46) / CELL_HEIGHT
+            x = (state.frog_rec[0] - 2) / CELL_WIDTH
+            y = (state.frog_rec[1] - 46) / CELL_HEIGHT
             print('time:', t)
             print('action:', action_names[action])
             print('frog cell: ({},{})'.format(int(x), int(y)))
