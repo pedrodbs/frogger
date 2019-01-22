@@ -12,8 +12,8 @@ GYM_ENV_ID = 'Custom-Frogger-v0'
 # default profile
 register(
     id=GYM_ENV_ID,
-    kwargs={MAX_STEPS_ATTR: DEFAULT_MAX_STEPS, LIVES_ATTR: DEFAULT_LIVES, FPS_ATTR: 30, FORCE_FPS_ATTR: True,
-            SOUND_ATTR: False, DISPLAY_SCREEN_ATTR: True},
+    kwargs={MAX_STEPS_ATTR: DEFAULT_MAX_STEPS, LIVES_ATTR: DEFAULT_LIVES, FPS_ATTR: 4, FORCE_FPS_ATTR: False,
+            SOUND_ATTR: False, DISPLAY_SCREEN_ATTR: False},
     entry_point=FROGGER_ENTRY_POINT_STR,
     tags={MAX_EPISODE_STEPS_ATTR: DEFAULT_MAX_STEPS * DEFAULT_LIVES},
     nondeterministic=False,

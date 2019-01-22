@@ -61,10 +61,6 @@ class FroggerEnv(Env):
 
         self._action_set = self.game_state.getActionSet()
         self.action_space = spaces.Discrete(len(self._action_set))
-        self.screen_height = HEIGHT
-        self.screen_width = WIDTH
-
-        # sets appropriate obs space
         self.observation_space = \
             spaces.Box(low=0, high=255, shape=self.game_state.game.getGameState().shape, dtype=np.uint8)
 
@@ -85,7 +81,8 @@ class FroggerEnv(Env):
 
             # performs several updates to the game per action (move)
             for i in range(ANIMATIONS_PER_MOVE):
-                self.game_state.game.tick(self.game_state.fps)
+                if not self.game_state.force_fps:
+                    self.game_state.game.tick(self.game_state.fps)
                 self.game_state.game.step(0)
                 self.game_state._draw_frame()
 
