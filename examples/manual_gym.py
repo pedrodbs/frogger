@@ -95,9 +95,9 @@ if __name__ == '__main__':
 
             clean_console()
             state = FroggerState.from_observation(obs)
-            x = (state.frog_rec[0] - 2) / CELL_WIDTH
-            y = (state.frog_rec[1] - 46) / CELL_HEIGHT
-            print('frog pos: ({},{})'.format(state.frog_rec[0], state.frog_rec[1]))
+            x = (state.frog_info[0] - 2) / CELL_WIDTH
+            y = (state.frog_info[1] - 46) / CELL_HEIGHT
+            print('frog pos: ({},{})'.format(state.frog_info[0], state.frog_info[1]))
             print('frog cell: ({},{})'.format(x, y))
 
             total_reward += rwd

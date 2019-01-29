@@ -136,6 +136,7 @@ class Frogger(PyGameWrapper):
         self._create_cars()
         self._create_logs()
 
+        # todo
         move_list(self.cars, self.game.speed)
         move_list(self.logs, self.game.speed)
 
@@ -243,75 +244,32 @@ class Frogger(PyGameWrapper):
             self.ticks_cars[i] -= 1
             if tick > 0:
                 continue
-            if i == 0:
-                self.ticks_cars[0] = (40 * self.game.speed) / self.game.level
-                position_init = [-55, 436]
-                car = Car(position_init, self.car_sprites[i], 'right', 1)
-                self.cars.append(car)
-            elif i == 1:
-                self.ticks_cars[1] = (30 * self.game.speed) / self.game.level
-                position_init = [506, 397]
-                car = Car(position_init, self.car_sprites[i], 'left', 2)
-                self.cars.append(car)
-            elif i == 2:
-                self.ticks_cars[2] = (40 * self.game.speed) / self.game.level
-                position_init = [-80, 357]
-                car = Car(position_init, self.car_sprites[i], 'right', 2)
-                self.cars.append(car)
-            elif i == 3:
-                self.ticks_cars[3] = (30 * self.game.speed) / self.game.level
-                position_init = [516, 318]
-                car = Car(position_init, self.car_sprites[i], 'left', 1)
-                self.cars.append(car)
-            elif i == 4:
-                self.ticks_cars[4] = (50 * self.game.speed) / self.game.level
-                position_init = [-56, 280]
-                car = Car(position_init, self.car_sprites[i], 'right', 1)
-                self.cars.append(car)
+
+            # adds a new car in this row
+            self.ticks_cars[i] = (CARS_INIT_TICKS[i] * self.game.speed) / self.game.level
+            car = Car(CARS_INIT_POS[i].copy(), self.car_sprites[i], ACTION_RIGHT_KEY if i % 2 == 0 else ACTION_LEFT_KEY,
+                      CARS_SPEED_FACTORS[i])
+            self.cars.append(car)
 
     def _destroy_cars(self):
         for i in self.cars:
-            if i.position[0] < -80:
-                self.cars.remove(i)
-            elif i.position[0] > 516:
+            if i.position[0] < -80 or i.position[0] > 516:
                 self.cars.remove(i)
 
     def _create_logs(self):
         for i, tick in enumerate(self.ticks_logs):
-            self.ticks_logs[i] = self.ticks_logs[i] - 1
+            self.ticks_logs[i] -= 1
             if tick > 0:
                 continue
-            if i == 0:
-                self.ticks_logs[0] = (30 * self.game.speed) / self.game.level
-                position_init = [-100, 200]
-                log = Log(position_init, self.log_sprite, 'right')
-                self.logs.append(log)
-            elif i == 1:
-                self.ticks_logs[1] = (30 * self.game.speed) / self.game.level
-                position_init = [448, 161]
-                log = Log(position_init, self.log_sprite, 'left')
-                self.logs.append(log)
-            elif i == 2:
-                self.ticks_logs[2] = (40 * self.game.speed) / self.game.level
-                position_init = [-100, 122]
-                log = Log(position_init, self.log_sprite, 'right')
-                self.logs.append(log)
-            elif i == 3:
-                self.ticks_logs[3] = (40 * self.game.speed) / self.game.level
-                position_init = [448, 83]
-                log = Log(position_init, self.log_sprite, 'left')
-                self.logs.append(log)
-            elif i == 4:
-                self.ticks_logs[4] = (20 * self.game.speed) / self.game.level
-                position_init = [-100, 44]
-                log = Log(position_init, self.log_sprite, 'right')
-                self.logs.append(log)
+
+            # adds a new log in this row
+            self.ticks_logs[i] = (LOGS_INIT_TICKS[i] * self.game.speed) / self.game.level
+            log = Log(LOGS_INIT_POS[i].copy(), self.log_sprite, ACTION_RIGHT_KEY if i % 2 == 0 else ACTION_LEFT_KEY)
+            self.logs.append(log)
 
     def _destroy_logs(self):
         for i in self.logs:
-            if i.position[0] < -100:
-                self.logs.remove(i)
-            elif i.position[0] > 448:
+            if i.position[0] < -100 or i.position[0] > 448:
                 self.logs.remove(i)
 
     def _frog_on_the_street(self):
@@ -326,8 +284,10 @@ class Frogger(PyGameWrapper):
                 break
 
     def _frog_in_the_lake(self):
+
+        # checks for collision with any log (frog is safe)
         safe = False
-        log_dir = ''
+        log_dir = None
         for log in self.logs:
             log_rect = log.rect()
             frog_rect = self.frog.rect()
@@ -337,27 +297,29 @@ class Frogger(PyGameWrapper):
                 break
 
         if not safe:
+            # if frog is in the water
             if self.sound:
                 self.water_sound.play()
             self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
             self.game.points += self._get_reward(HIT_WATER_RWD_ATTR)
 
         else:
-            if log_dir == 'right':
+            # otherwise update position according to log movement
+            if log_dir == ACTION_RIGHT_KEY:
                 self.frog.position[0] += self.game.speed
 
-            elif log_dir == 'left':
+            elif log_dir == ACTION_LEFT_KEY:
                 self.frog.position[0] -= self.game.speed
 
     def _occupied(self, position):
         return any([fg.position == position for fg in self.arrived_frogs])
 
     def _check_frog_arrived(self):
-
         # checks if frog jumps to any lily pad
         for arrival_x in ARRIVAL_POSITIONS:
             arrive_pos = [arrival_x, 7]
-            if arrival_x - 10 < self.frog.position[0] < arrival_x + 10 and not self._occupied(arrive_pos):
+            if not self._occupied(arrive_pos) and \
+                    arrival_x - ARRIVAL_WIDTH < self.frog.position[0] < arrival_x + ARRIVAL_WIDTH:
                 self._create_arrived(arrive_pos)
                 return
 
@@ -380,7 +342,7 @@ class Frogger(PyGameWrapper):
             self._check_frog_arrived()
 
     def _create_arrived(self, position_init):
-        frog_arrived = Object(position_init, self.sprite_arrived)
+        frog_arrived = Object(position_init, self.sprite_arrived, ACTION_DOWN_KEY)
 
         if self.sound:
             self.arrived_sound.play()
@@ -403,9 +365,10 @@ class Frogger(PyGameWrapper):
 
 
 class Object(object):
-    def __init__(self, position, sprite):
+    def __init__(self, position, sprite, way):
         self.sprite = sprite
         self.position = position
+        self.way = way
 
     def draw(self, screen):
         screen.blit(self.sprite, tuple(self.position))
@@ -416,11 +379,10 @@ class Object(object):
 
 class Frog(Object):
     def __init__(self, position, sprite, lives, frog_sprites):
-        super().__init__(position, sprite)
+        super().__init__(position, sprite, ACTION_UP_KEY)
         self.frog_sprites = frog_sprites
         self.lives = lives
         self.animation_counter = 0
-        self.way = ACTION_UP_KEY
         self.is_moving = False
         self.init_position = position.copy()
 
@@ -484,27 +446,25 @@ class Frog(Object):
 
 class Car(Object):
     def __init__(self, position, sprite, way, factor):
-        super().__init__(position, sprite)
-        self.way = way
+        super().__init__(position, sprite, way)
         self.factor = factor
 
     def move(self, speed):
-        if self.way == 'right':
-            self.position[0] = self.position[0] + speed * self.factor
-        elif self.way == 'left':
-            self.position[0] = self.position[0] - speed * self.factor
+        if self.way == ACTION_RIGHT_KEY:
+            self.position[0] += speed * self.factor
+        elif self.way == ACTION_LEFT_KEY:
+            self.position[0] -= speed * self.factor
 
 
 class Log(Object):
     def __init__(self, position, sprite, way):
-        super().__init__(position, sprite)
-        self.way = way
+        super().__init__(position, sprite, way)
 
     def move(self, speed):
-        if self.way == 'right':
-            self.position[0] = self.position[0] + speed
-        elif self.way == 'left':
-            self.position[0] = self.position[0] - speed
+        if self.way == ACTION_RIGHT_KEY:
+            self.position[0] += speed
+        elif self.way == ACTION_LEFT_KEY:
+            self.position[0] -= speed
 
 
 class Game(object):

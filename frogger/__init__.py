@@ -9,7 +9,13 @@ WIDTH = 448
 CELL_WIDTH = 41
 CELL_HEIGHT = 39
 FROG_INIT_POS = [207, 475]
+LOGS_INIT_POS = [[-100, 200], [448, 161], [-100, 122], [448, 83], [-100, 44]]
+LOGS_INIT_TICKS = [30, 30, 40, 40, 20]
 ARRIVAL_POSITIONS = [43, 125, 207, 289, 371]
+CARS_INIT_POS = [[-55, 436], [506, 397], [-80, 357], [516, 318], [-56, 280]]
+CARS_INIT_TICKS = [40, 30, 40, 30, 50]
+CARS_SPEED_FACTORS = [1, 2, 2, 1, 1]
+ARRIVAL_WIDTH = 15
 MAX_CAR_TICKS = 60
 MAX_LOG_TICK = 30
 ACTION_UP_KEY = K_UP
@@ -39,14 +45,14 @@ class FroggerState(object):
         """
         Creates a new empty frogger state based on the given Frogger instance.
         """
-        self.game_steps = 0
-        self.game_level = 0
-        self.game_points = 0.
+        self.steps = 0
+        self.level = 0
+        self.points = 0.
         self.lives = 0
-        self.arrived_frogs = [0] * len(ARRIVAL_POSITIONS)
-        self.frog_rec = []
-        self.car_recs = []
-        self.log_recs = []
+        self.arrived_frogs = [False] * len(ARRIVAL_POSITIONS)
+        self.frog_info = []
+        self.car_infos = []
+        self.log_infos = []
 
     @staticmethod
     def from_game(game, arrived_frogs, frog, cars, logs):
@@ -60,24 +66,24 @@ class FroggerState(object):
         :return FroggerState: the state corresponding to the given Frogger instance.
         """
         game_state = FroggerState()
-        game_state.game_steps = game.steps
-        game_state.game_level = game.level
-        game_state.game_points = game.points
+        game_state.steps = game.steps
+        game_state.level = game.level
+        game_state.points = game.points
         game_state.lives = frog.lives
 
         # checks frog arrived indexes
         for arrived_frog in arrived_frogs:
             for i, arrival_x in enumerate(ARRIVAL_POSITIONS):
                 if arrived_frog.position[0] == ARRIVAL_POSITIONS[i]:
-                    game_state.arrived_frogs[i] = 1
+                    game_state.arrived_frogs[i] = True
                     break
 
-        game_state.car_recs = [game_state._get_rect(car) for car in cars]
-        game_state.log_recs = [game_state._get_rect(log) for log in logs]
+        game_state.car_infos = [game_state._get_obj_info(car) for car in cars]
+        game_state.log_infos = [game_state._get_obj_info(log) for log in logs]
 
-        # correct frog rectangle width due to animations
-        game_state.frog_rec = game_state._get_rect(frog)
-        game_state.frog_rec[2] /= ANIMATIONS_PER_MOVE
+        # correct frog width width due to animations
+        game_state.frog_info = game_state._get_obj_info(frog)
+        game_state.frog_info[2] /= ANIMATIONS_PER_MOVE
 
         return game_state
 
@@ -89,24 +95,25 @@ class FroggerState(object):
         :return FroggerState: the state corresponding to the given observation.
         """
         game_state = FroggerState()
-        game_state.game_steps = int(obs[0])
-        game_state.game_level = int(obs[1])
-        game_state.game_points = obs[2].item()
-        game_state.lives = int(obs[3])
-        game_state.arrived_frogs = obs[4:9].astype(int).tolist()
-        game_state.frog_rec = obs[9:13].tolist()
+        game_state.steps = int(obs[0])
+        game_state.level = int(obs[1])
+        game_state.points = obs[2].item()
+        game_state.lives = max(0, int(obs[3]))
+        game_state.arrived_frogs = obs[4:9].astype(bool).tolist()
+        game_state.frog_info = obs[9:14].tolist()
 
         # reads cars until reaching separator
-        idx = 13
+        idx = 14
+        info_size = 5
         while True:
             if obs[idx] == OBS_SEPARATOR:
                 break
-            game_state.car_recs.append(obs[idx:idx + 4].tolist())
-            idx += 4
+            game_state.car_infos.append(obs[idx:idx + info_size].tolist())
+            idx += info_size
 
         # reads logs
-        for idx in range(idx + 1, len(obs), 4):
-            game_state.log_recs.append(obs[idx:idx + 4].tolist())
+        for idx in range(idx + 1, len(obs), info_size):
+            game_state.log_infos.append(obs[idx:idx + info_size].tolist())
 
         return game_state
 
@@ -117,30 +124,30 @@ class FroggerState(object):
         """
 
         # add game stats and frog info
-        obs_list = [self.game_steps,
-                    self.game_level,
-                    self.game_points,
+        obs_list = [self.steps,
+                    self.level,
+                    self.points,
                     self.lives]
 
-        obs_list.extend(self.arrived_frogs)
+        obs_list.extend(np.array(self.arrived_frogs, dtype=int))
 
         # adds frog and car rectangles
-        obs_list.extend(self.frog_rec)
-        for car_rec in self.car_recs:
+        obs_list.extend(self.frog_info)
+        for car_rec in self.car_infos:
             obs_list.extend(car_rec)
 
         # puts separator before logs rectangles
         obs_list.append(OBS_SEPARATOR)
-        for log_rec in self.log_recs:
+        for log_rec in self.log_infos:
             obs_list.extend(log_rec)
 
         return np.array(obs_list)
 
     @staticmethod
-    def _get_rect(obj):
+    def _get_obj_info(obj):
         """
-        Gets the rectangle coordinates for the given object.
+        Gets the info for the given object, including its position, size and direction key.
         :param Object obj: the object from which to retrieve the coordinates.
-        :return list: a list with the rectangle coordinates ([x, y, w, h]) of the object.
+        :return list: a list with the object information, namely [x, y, width, height, dir].
         """
-        return [obj.position[0], obj.position[1], obj.sprite.get_width(), obj.sprite.get_height()]
+        return [obj.position[0], obj.position[1], obj.sprite.get_width(), obj.sprite.get_height(), obj.way]
