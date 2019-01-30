@@ -54,7 +54,7 @@ class Frogger(PyGameWrapper):
         self.show_stats = show_stats
         self.sound = sound
 
-        self.key_pressed = 0
+        self.key_pressed = INVALID_ACTION_KEY
         self.process_events = False
         self.game_init = False
 
@@ -85,7 +85,7 @@ class Frogger(PyGameWrapper):
 
         self._init_resources()
 
-        self.key_pressed = 0
+        self.key_pressed = INVALID_ACTION_KEY
         self.process_events = False
 
         self.cars = []
@@ -96,6 +96,10 @@ class Frogger(PyGameWrapper):
 
         self.frog = Frog(FROG_INIT_POS.copy(), self.frog_sprites[ACTION_UP_KEY], self.init_lives, self.frog_sprites)
         self.game = Game(self.init_speed, self.init_level, self.max_steps)
+
+        self.screen.blit(self.background, (0, 0))
+        self.frog.draw(self.screen)
+        pygame.display.flip()
 
     def getScore(self):
         return self.game.points
@@ -111,7 +115,7 @@ class Frogger(PyGameWrapper):
 
         # checks 'wait for key' state
         if not self.frog.is_moving:
-            self.key_pressed = 0
+            self.key_pressed = INVALID_ACTION_KEY
 
         # processes events
         if self.process_events:
@@ -136,7 +140,6 @@ class Frogger(PyGameWrapper):
         self._create_cars()
         self._create_logs()
 
-        # todo
         move_list(self.cars, self.game.speed)
         move_list(self.logs, self.game.speed)
 
@@ -283,7 +286,7 @@ class Frogger(PyGameWrapper):
                 self.game.points += self._get_reward(HIT_CAR_RWD_ATTR)
                 break
 
-    def _frog_in_the_lake(self):
+    def _frog_in_the_river(self):
 
         # checks for collision with any log (frog is safe)
         safe = False
@@ -329,17 +332,17 @@ class Frogger(PyGameWrapper):
         self.frog.is_moving = False
 
     def _check_frog_location(self):
+        # check if frog achieved final position
+        if self.frog.position[1] < 40:
+            self._check_frog_arrived()
+
         # if frog is crossing the road
         if 241 < self.frog.position[1] < 475:
             self._frog_on_the_street()
 
-        # if frog is in the river river
+        # if frog is in the river
         elif 40 < self.frog.position[1] < 241:
-            self._frog_in_the_lake()
-
-        # frog achieved final position
-        elif self.frog.position[1] < 40:
-            self._check_frog_arrived()
+            self._frog_in_the_river()
 
     def _create_arrived(self, position_init):
         frog_arrived = Object(position_init, self.sprite_arrived, ACTION_DOWN_KEY)
