@@ -58,6 +58,9 @@ class Frogger(PyGameWrapper):
         self.process_events = False
         self.game_init = False
 
+        self.dead_counter = 0
+        self.dead_object = None
+
         self.frog = Frog(FROG_INIT_POS.copy(), None, self.init_lives, {})
         self.game = Game(self.init_speed, self.init_level, self.max_steps)
 
@@ -74,6 +77,10 @@ class Frogger(PyGameWrapper):
         self.background = None
         self.frog_sprites = {}
         self.sprite_arrived = None
+        self.frog_life_sprite = None
+        self.sprite_drowned = None
+        self.sprite_time_up = None
+        self.sprite_crash = None
         self.car_sprites = []
         self.log_sprite = None
         self.hit_sound = None
@@ -88,6 +95,9 @@ class Frogger(PyGameWrapper):
         self.key_pressed = INVALID_ACTION_KEY
         self.process_events = False
 
+        self.dead_counter = 0
+        self.dead_object = None
+
         self.cars = []
         self.logs = []
         self.arrived_frogs = []
@@ -99,6 +109,8 @@ class Frogger(PyGameWrapper):
 
         self.screen.blit(self.background, (0, 0))
         self.frog.draw(self.screen)
+        if self.show_stats:
+            self._draw_stats()
         pygame.display.flip()
 
     def getScore(self):
@@ -106,6 +118,14 @@ class Frogger(PyGameWrapper):
 
     def game_over(self):
         return self.frog.lives == 0
+
+    @staticmethod
+    def _is_valid_key(key):
+        return key == ACTION_LEFT_KEY or \
+               key == ACTION_RIGHT_KEY or \
+               key == ACTION_UP_KEY or \
+               key == ACTION_DOWN_KEY or \
+               key == ACTION_NO_MOVE_KEY
 
     def step(self, dt):
 
@@ -119,15 +139,18 @@ class Frogger(PyGameWrapper):
 
         # processes events
         if self.process_events:
+
             self.process_events = False
             for event in pygame.event.get():
                 if event.type == QUIT:
                     exit()
-                if event.type == KEYDOWN and not self.frog.is_moving:
-                    # sets new direction and locks frog movement
+                if event.type == KEYDOWN and not self.frog.is_moving and self._is_valid_key(event.key):
                     self.key_pressed = event.key
-                    self.frog.update_sprite(self.key_pressed)
-                    self.frog.is_moving = True
+
+                    # sets new direction and locks frog movement
+                    if self.key_pressed != ACTION_NO_MOVE_KEY:
+                        self.frog.update_sprite(self.key_pressed)
+                        self.frog.is_moving = True
 
         # refreshes screen if needed
         pygame.event.pump()
@@ -135,6 +158,7 @@ class Frogger(PyGameWrapper):
         # checks max moves
         if self.game.steps == 0:
             self.game.points += self._get_reward(TIME_UP_RWD_ATTR)
+            self._set_death_sprite(self.sprite_time_up)
             self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
 
         self._create_cars()
@@ -159,21 +183,37 @@ class Frogger(PyGameWrapper):
         self._check_frog_location()
         self._check_next_level()
 
+        # checks death image
+        if self.dead_counter > 0:
+            self.dead_object.draw(self.screen)
+            self.dead_counter -= 1
+            if self.dead_counter == 0:
+                self.dead_object = None
+
         # show stats
         if self.show_stats:
-            text_info1 = self.info_font.render(
-                ('Level: {}'.format(self.game.level)), 1, (TXT_COLOR, TXT_COLOR, TXT_COLOR))
-            text_info2 = self.info_font.render(
-                ('Points: {}'.format(self.game.points)), 1, (TXT_COLOR, TXT_COLOR, TXT_COLOR))
-            text_info3 = self.info_font.render(
-                ('Moves: {}'.format(self.game.steps)), 1, (TXT_COLOR, TXT_COLOR, TXT_COLOR))
-            text_info4 = self.info_font.render(
-                ('Lives: {}'.format(self.frog.lives)), 1, (TXT_COLOR, TXT_COLOR, TXT_COLOR))
+            self._draw_stats()
 
-            self.screen.blit(text_info1, (10, 520))
-            self.screen.blit(text_info2, (120, 520))
-            self.screen.blit(text_info3, (250, 520))
-            self.screen.blit(text_info4, (370, 520))
+    def _set_death_sprite(self, sprite):
+        self.dead_object = Object(self.frog.position.copy(), sprite, ACTION_DOWN_KEY)
+        self.dead_counter = DEATH_IMAGE_TIME_STEPS
+
+    def _draw_stats(self):
+        level_text_info = self.info_font.render(
+            ('Level: {}'.format(self.game.level)), 1, (TXT_COLOR, TXT_COLOR, TXT_COLOR))
+        points_text_info = self.info_font.render(
+            ('Points: {}'.format(self.game.points)), 1, (TXT_COLOR, TXT_COLOR, TXT_COLOR))
+        moves_text_info = self.info_font.render(
+            ('Moves: {}'.format(self.game.steps)), 1, (TXT_COLOR, TXT_COLOR, TXT_COLOR))
+        # lives_text_info = self.info_font.render(
+        #     ('Lives: {}'.format(self.frog.lives)), 1, (TXT_COLOR, TXT_COLOR, TXT_COLOR))
+        self.screen.blit(level_text_info, (10, 520))
+        self.screen.blit(moves_text_info, (100, 520))
+        self.screen.blit(points_text_info, (220, 520))
+        # self.screen.blit(lives_text_info, (370, 520))
+        for i in range(self.frog.lives - 1):
+            self.screen.blit(self.frog_life_sprite,
+                             (WIDTH - 4 - (i + 1) * (self.sprite_arrived.get_width() + 4), 513))
 
     def getGameState(self):
         return FroggerState.from_game(
@@ -221,6 +261,10 @@ class Frogger(PyGameWrapper):
                              ACTION_RIGHT_KEY: sprite_frog_right}
 
         self.sprite_arrived = self._load_img(_dir, 'images/frog_arrived.png').convert_alpha()
+        self.frog_life_sprite = pygame.transform.rotate(self.sprite_arrived, 180)
+        self.sprite_drowned = self._load_img(_dir, 'images/splash.png').convert_alpha()
+        self.sprite_time_up = self._load_img(_dir, 'images/clock.png').convert_alpha()
+        self.sprite_crash = self._load_img(_dir, 'images/burst.png').convert_alpha()
 
         sprite_car1 = self._load_img(_dir, 'images/car1.png').convert_alpha()
         sprite_car2 = self._load_img(_dir, 'images/car2.png').convert_alpha()
@@ -275,13 +319,14 @@ class Frogger(PyGameWrapper):
             if i.position[0] < -100 or i.position[0] > 448:
                 self.logs.remove(i)
 
-    def _frog_on_the_street(self):
+    def _frog_on_the_road(self):
         for car in self.cars:
             car_rect = car.rect()
             frog_rect = self.frog.rect()
             if frog_rect.colliderect(car_rect):
                 if self.sound:
                     self.hit_sound.play()
+                self._set_death_sprite(self.sprite_crash)
                 self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
                 self.game.points += self._get_reward(HIT_CAR_RWD_ATTR)
                 break
@@ -299,14 +344,7 @@ class Frogger(PyGameWrapper):
                 log_dir = log.way
                 break
 
-        if not safe:
-            # if frog is in the water
-            if self.sound:
-                self.water_sound.play()
-            self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
-            self.game.points += self._get_reward(HIT_WATER_RWD_ATTR)
-
-        else:
+        if safe:
             # otherwise update position according to log movement
             if log_dir == ACTION_RIGHT_KEY:
                 self.frog.position[0] += self.game.speed
@@ -314,34 +352,46 @@ class Frogger(PyGameWrapper):
             elif log_dir == ACTION_LEFT_KEY:
                 self.frog.position[0] -= self.game.speed
 
+            # checks frog out-of-bounds (assume fell on water)
+            safe = - FROG_SIZE < self.frog.position[0] < WIDTH
+
+        if not safe:
+            # if frog is in the water
+            if self.sound:
+                self.water_sound.play()
+            self._set_death_sprite(self.sprite_drowned)
+            self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
+            self.game.points += self._get_reward(HIT_WATER_RWD_ATTR)
+
     def _occupied(self, position):
         return any([fg.position == position for fg in self.arrived_frogs])
 
     def _check_frog_arrived(self):
         # checks if frog jumps to any lily pad
         for arrival_x in ARRIVAL_POSITIONS:
-            arrive_pos = [arrival_x, 7]
+            arrive_pos = [arrival_x, ARRIVAL_POSITION_Y]
             if not self._occupied(arrive_pos) and \
                     arrival_x - ARRIVAL_WIDTH < self.frog.position[0] < arrival_x + ARRIVAL_WIDTH:
                 self._create_arrived(arrive_pos)
                 return
 
         # otherwise put's frog back in log
-        self.frog.position[1] = 46
+        self.frog.position[1] = MIN_Y_POS
         self.frog.animation_counter = 0
         self.frog.is_moving = False
 
     def _check_frog_location(self):
+
         # check if frog achieved final position
-        if self.frog.position[1] < 40:
+        if self.frog.position[1] < MIN_Y_POS:
             self._check_frog_arrived()
 
         # if frog is crossing the road
-        if 241 < self.frog.position[1] < 475:
-            self._frog_on_the_street()
+        if MAX_GRASS_Y_POS < self.frog.position[1] < MAX_Y_POS:
+            self._frog_on_the_road()
 
         # if frog is in the river
-        elif 40 < self.frog.position[1] < 241:
+        elif MIN_Y_POS <= self.frog.position[1] < MAX_GRASS_Y_POS:
             self._frog_in_the_river()
 
     def _create_arrived(self, position_init):
@@ -390,7 +440,7 @@ class Frog(Object):
         self.init_position = position.copy()
 
     def update_sprite(self, key_pressed):
-        if self.way == key_pressed or key_pressed not in self.frog_sprites:
+        if key_pressed not in self.frog_sprites:
             return
         self.way = key_pressed
         self.sprite = self.frog_sprites[key_pressed]
@@ -399,18 +449,15 @@ class Frog(Object):
         if not self.is_moving:
             return
 
-        if key_pressed == ACTION_UP_KEY:
-            if self.position[1] > 39:
-                self.position[1] -= 9 if self.animation_counter == ANIMATIONS_PER_MOVE - 1 else 10
-        elif key_pressed == ACTION_DOWN_KEY:
-            if self.position[1] <= 471:
-                self.position[1] += 9 if self.animation_counter == ANIMATIONS_PER_MOVE - 1 else 10
-        elif key_pressed == ACTION_LEFT_KEY:
-            if self.position[0] > 2:
-                self.position[0] -= 11 if self.animation_counter == ANIMATIONS_PER_MOVE - 1 else 10
-        elif key_pressed == ACTION_RIGHT_KEY:
-            if self.position[0] <= 407:
-                self.position[0] += 11 if self.animation_counter == ANIMATIONS_PER_MOVE - 1 else 10
+        if key_pressed == ACTION_UP_KEY and self.position[1] >= MIN_Y_POS:
+            self.position[1] -= 9 if self.animation_counter == ANIMATIONS_PER_MOVE - 1 else 10
+        elif key_pressed == ACTION_DOWN_KEY and self.position[1] <= MAX_Y_POS:
+            y_delta = 9 if self.animation_counter == ANIMATIONS_PER_MOVE - 1 else 10
+            self.position[1] = min(MAX_Y_POS, self.position[1] + y_delta)
+        elif key_pressed == ACTION_LEFT_KEY and self.position[0] > 0:
+            self.position[0] = max(0, self.position[0] - CELL_WIDTH / ANIMATIONS_PER_MOVE)
+        elif key_pressed == ACTION_RIGHT_KEY and self.position[0] < WIDTH - CELL_WIDTH:
+            self.position[0] = min(WIDTH - CELL_WIDTH, self.position[0] + CELL_WIDTH / ANIMATIONS_PER_MOVE)
 
     def animate(self):
         if not self.is_moving:
@@ -434,17 +481,16 @@ class Frog(Object):
         self.set_to_initial_position()
         self.animation_counter = 0
         self.is_moving = False
-        self.update_sprite(ACTION_UP_KEY)
 
     def set_to_initial_position(self):
         self.position = self.init_position.copy()
 
     def draw(self, screen):
-        current_sprite = self.animation_counter * 30
-        screen.blit(self.sprite, tuple(self.position), (current_sprite, 0, 30, 30 + current_sprite))
+        current_sprite = self.animation_counter * FROG_SIZE
+        screen.blit(self.sprite, tuple(self.position), (current_sprite, 0, FROG_SIZE, FROG_SIZE + current_sprite))
 
     def rect(self):
-        return Rect(self.position[0], self.position[1], 30, 30)
+        return Rect(self.position[0], self.position[1], FROG_SIZE, FROG_SIZE)
 
 
 class Car(Object):

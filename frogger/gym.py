@@ -119,8 +119,8 @@ class FroggerEnv(Env):
         return reward
 
     def _set_action(self, action):
-        if action is not None:
-            self.game_state.game._setAction(action, self.last_action)
+        # if action is not None:
+        self.game_state.game._setAction(action, self.last_action)
         self.last_action = action
 
     def _get_image(self):

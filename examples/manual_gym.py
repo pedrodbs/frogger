@@ -7,11 +7,11 @@ from os.path import exists
 from collections import OrderedDict
 from gym.wrappers import Monitor
 from frogger import FroggerState, CELL_WIDTH, CELL_HEIGHT, ACTION_LEFT_KEY, ACTION_RIGHT_KEY, ACTION_UP_KEY, \
-    ACTION_DOWN_KEY
+    ACTION_DOWN_KEY, MIN_Y_POS
 from frogger.gym import *
 
 GAME_GYM_ID = 'Frogger-Custom-v0'
-NAX_STEPS = 300
+NAX_STEPS = 60
 NUM_ARRIVED_FROGS = 2
 ACTIONS = OrderedDict([
     ('up', ACTION_UP_KEY),
@@ -22,7 +22,8 @@ ACTIONS = OrderedDict([
 register(
     id=GAME_GYM_ID,
     kwargs={MAX_STEPS_ATTR: NAX_STEPS, LIVES_ATTR: DEFAULT_LIVES, ACTIONS_ATTR: ACTIONS,
-            NUM_ARRIVED_FROGS_ATTR: NUM_ARRIVED_FROGS, FORCE_FPS_ATTR: True, FPS_ATTR: 20, DISPLAY_SCREEN_ATTR: True},
+            NUM_ARRIVED_FROGS_ATTR: NUM_ARRIVED_FROGS, FORCE_FPS_ATTR: True, FPS_ATTR: 20, DISPLAY_SCREEN_ATTR: True,
+            SOUND_ATTR: False},
     entry_point=FROGGER_ENTRY_POINT_STR,
     tags={MAX_EPISODE_STEPS_ATTR: NAX_STEPS * DEFAULT_LIVES},
     nondeterministic=False,
@@ -95,10 +96,11 @@ if __name__ == '__main__':
 
             clean_console()
             state = FroggerState.from_observation(obs)
-            x = (state.frog_info[0] - 2) / CELL_WIDTH
-            y = (state.frog_info[1] - 46) / CELL_HEIGHT
+            x = (state.frog_info[0]) / CELL_WIDTH
+            y = (state.frog_info[1] - MIN_Y_POS) / CELL_HEIGHT
             print('frog pos: ({},{})'.format(state.frog_info[0], state.frog_info[1]))
             print('frog cell: ({},{})'.format(x, y))
+            print('frog cell: ({},{})'.format(int(x), int(y)))
 
             total_reward += rwd
             total_time_steps += 1
