@@ -78,9 +78,9 @@ class Frogger(PyGameWrapper):
         self.frog_sprites = {}
         self.sprite_arrived = None
         self.frog_life_sprite = None
-        self.sprite_drowned = None
-        self.sprite_time_up = None
-        self.sprite_crash = None
+        self.sprites_drowned = []
+        self.sprites_time_up = []
+        self.sprites_crash = []
         self.car_sprites = []
         self.log_sprite = None
         self.hit_sound = None
@@ -158,7 +158,7 @@ class Frogger(PyGameWrapper):
         # checks max moves
         if self.game.steps == 0:
             self.game.points += self._get_reward(TIME_UP_RWD_ATTR)
-            self._set_death_sprite(self.sprite_time_up)
+            self._set_death_sprite(self.sprites_time_up)
             self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
 
         self._create_cars()
@@ -185,6 +185,7 @@ class Frogger(PyGameWrapper):
 
         # checks death image
         if self.dead_counter > 0:
+            self.dead_object.set_alpha(int(self.dead_counter / DEATH_IMAGE_TIME_STEPS * 255))
             self.dead_object.draw(self.screen)
             self.dead_counter -= 1
             if self.dead_counter == 0:
@@ -194,8 +195,16 @@ class Frogger(PyGameWrapper):
         if self.show_stats:
             self._draw_stats()
 
-    def _set_death_sprite(self, sprite):
-        self.dead_object = Object(self.frog.position.copy(), sprite, ACTION_DOWN_KEY)
+    def _set_death_sprite(self, sprites):
+        # creates a new image object and resets counter
+        position = self.frog.position.copy()
+
+        # checks to void out-of-bounds image
+        position[0] = max(0, min(WIDTH - sprites[0].get_width(), position[0]))
+        if MIN_Y_POS <= self.frog.position[1] < MAX_GRASS_Y_POS:
+            position[1] = min(MAX_GRASS_Y_POS - CELL_HEIGHT, position[1])
+            
+        self.dead_object = AlphaObject(position, sprites)
         self.dead_counter = DEATH_IMAGE_TIME_STEPS
 
     def _draw_stats(self):
@@ -233,6 +242,20 @@ class Frogger(PyGameWrapper):
         return pygame.image.load(join(base_dir, img_path))
 
     @staticmethod
+    def _create_alpha_images(sprite):
+        # creates a list with copies of the given image with different global alphas
+        sprites = []
+        for a in range(256):
+            key = (0, 0, 0)
+            surface = pygame.Surface(sprite.get_size(), depth=24)
+            surface.fill(key, surface.get_rect())
+            surface.set_colorkey(key)
+            surface.blit(sprite, (0, 0))
+            surface.set_alpha(a)
+            sprites.append(surface)
+        return sprites
+
+    @staticmethod
     def _load_sound(base_dir, sound_path):
         return pygame.mixer.Sound(join(base_dir, sound_path))
 
@@ -262,9 +285,10 @@ class Frogger(PyGameWrapper):
 
         self.sprite_arrived = self._load_img(_dir, 'images/frog_arrived.png').convert_alpha()
         self.frog_life_sprite = pygame.transform.rotate(self.sprite_arrived, 180)
-        self.sprite_drowned = self._load_img(_dir, 'images/splash.png').convert_alpha()
-        self.sprite_time_up = self._load_img(_dir, 'images/clock.png').convert_alpha()
-        self.sprite_crash = self._load_img(_dir, 'images/burst.png').convert_alpha()
+
+        self.sprites_drowned = self._create_alpha_images(self._load_img(_dir, 'images/splash.png').convert_alpha())
+        self.sprites_time_up = self._create_alpha_images(self._load_img(_dir, 'images/clock.png').convert_alpha())
+        self.sprites_crash = self._create_alpha_images(self._load_img(_dir, 'images/burst.png').convert_alpha())
 
         sprite_car1 = self._load_img(_dir, 'images/car1.png').convert_alpha()
         sprite_car2 = self._load_img(_dir, 'images/car2.png').convert_alpha()
@@ -326,7 +350,7 @@ class Frogger(PyGameWrapper):
             if frog_rect.colliderect(car_rect):
                 if self.sound:
                     self.hit_sound.play()
-                self._set_death_sprite(self.sprite_crash)
+                self._set_death_sprite(self.sprites_crash)
                 self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
                 self.game.points += self._get_reward(HIT_CAR_RWD_ATTR)
                 break
@@ -359,7 +383,7 @@ class Frogger(PyGameWrapper):
             # if frog is in the water
             if self.sound:
                 self.water_sound.play()
-            self._set_death_sprite(self.sprite_drowned)
+            self._set_death_sprite(self.sprites_drowned)
             self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
             self.game.points += self._get_reward(HIT_WATER_RWD_ATTR)
 
@@ -428,6 +452,15 @@ class Object(object):
 
     def rect(self):
         return Rect(self.position[0], self.position[1], self.sprite.get_width(), self.sprite.get_height())
+
+
+class AlphaObject(Object):
+    def __init__(self, position, sprites):
+        super().__init__(position, sprites[255], ACTION_DOWN_KEY)
+        self.sprites = sprites
+
+    def set_alpha(self, alpha):
+        self.sprite = self.sprites[alpha]
 
 
 class Frog(Object):
