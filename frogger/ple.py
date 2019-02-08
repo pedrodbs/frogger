@@ -12,13 +12,13 @@ from frogger import *
 
 # functions
 def draw_list(lst, screen):
-    for i in lst:
-        i.draw(screen)
+    for sprite in lst:
+        sprite.draw(screen)
 
 
 def move_list(lst, speed):
-    for i in lst:
-        i.move(speed)
+    for sprite in lst:
+        sprite.move(speed)
 
 
 class Frogger(PyGameWrapper):
@@ -61,8 +61,9 @@ class Frogger(PyGameWrapper):
         self.dead_counter = 0
         self.dead_object = None
 
-        self.frog = Frog(FROG_INIT_POS.copy(), None, self.init_lives, {})
         self.game = Game(self.init_speed, self.init_level, self.max_steps)
+        self.frog = Frog(FROG_INIT_POS.copy(), None, self.init_lives, {}, self.game,
+                         self._get_reward(NO_LIVES_RWD_ATTR))
 
         self.cars = []
         self.logs = []
@@ -104,8 +105,9 @@ class Frogger(PyGameWrapper):
         self.ticks_cars = [self.rng.randint(0, MAX_CAR_TICKS) for _ in range(5)]
         self.ticks_logs = [self.rng.randint(0, MAX_LOG_TICK) for _ in range(5)]
 
-        self.frog = Frog(FROG_INIT_POS.copy(), self.frog_sprites[ACTION_UP_KEY], self.init_lives, self.frog_sprites)
         self.game = Game(self.init_speed, self.init_level, self.max_steps)
+        self.frog = Frog(FROG_INIT_POS.copy(), self.frog_sprites[ACTION_UP_KEY], self.init_lives,
+                         self.frog_sprites, self.game, self._get_reward(NO_LIVES_RWD_ATTR))
 
         self.screen.blit(self.background, (0, 0))
         self.frog.draw(self.screen)
@@ -157,9 +159,8 @@ class Frogger(PyGameWrapper):
 
         # checks max moves
         if self.game.steps == 0:
-            self.game.points += self._get_reward(TIME_UP_RWD_ATTR)
             self._set_death_sprite(self.sprites_time_up)
-            self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
+            self.frog.set_dead(self._get_reward(TIME_UP_RWD_ATTR))
 
         self._create_cars()
         self._create_logs()
@@ -199,11 +200,11 @@ class Frogger(PyGameWrapper):
         # creates a new image object and resets counter
         position = self.frog.position.copy()
 
-        # checks to void out-of-bounds image
+        # checks to avoid out-of-bounds image
         position[0] = max(0, min(WIDTH - sprites[0].get_width(), position[0]))
         if MIN_Y_POS <= self.frog.position[1] < MAX_GRASS_Y_POS:
             position[1] = min(MAX_GRASS_Y_POS - CELL_HEIGHT, position[1])
-            
+
         self.dead_object = AlphaObject(position, sprites)
         self.dead_counter = DEATH_IMAGE_TIME_STEPS
 
@@ -339,53 +340,48 @@ class Frogger(PyGameWrapper):
             self.logs.append(log)
 
     def _destroy_logs(self):
-        for i in self.logs:
-            if i.position[0] < -100 or i.position[0] > 448:
-                self.logs.remove(i)
+        for log in self.logs:
+            if log.position[0] < -100 or log.position[0] > 448:
+                if self.frog.log == log:
+                    self.frog.log = None
+                self.logs.remove(log)
 
     def _frog_on_the_road(self):
+        frog_rect = self.frog.rect()
         for car in self.cars:
             car_rect = car.rect()
-            frog_rect = self.frog.rect()
             if frog_rect.colliderect(car_rect):
                 if self.sound:
                     self.hit_sound.play()
                 self._set_death_sprite(self.sprites_crash)
-                self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
-                self.game.points += self._get_reward(HIT_CAR_RWD_ATTR)
+                self.frog.set_dead(self._get_reward(HIT_CAR_RWD_ATTR))
                 break
 
     def _frog_in_the_river(self):
 
+        # wait until movement is done
+        if self.frog.log is not None:
+            return
+
         # checks for collision with any log (frog is safe)
+        frog_rect = self.frog.rect()
         safe = False
-        log_dir = None
         for log in self.logs:
             log_rect = log.rect()
-            frog_rect = self.frog.rect()
             if frog_rect.colliderect(log_rect):
                 safe = True
-                log_dir = log.way
+                self.frog.log = log
                 break
 
-        if safe:
-            # otherwise update position according to log movement
-            if log_dir == ACTION_RIGHT_KEY:
-                self.frog.position[0] += self.game.speed
-
-            elif log_dir == ACTION_LEFT_KEY:
-                self.frog.position[0] -= self.game.speed
-
-            # checks frog out-of-bounds (assume fell on water)
-            safe = - FROG_SIZE < self.frog.position[0] < WIDTH
+        # checks frog out-of-bounds (assume fell on water)
+        safe = safe and - FROG_SIZE < self.frog.position[0] < WIDTH
 
         if not safe:
             # if frog is in the water
             if self.sound:
                 self.water_sound.play()
             self._set_death_sprite(self.sprites_drowned)
-            self.frog.set_dead(self.game, self._get_reward(NO_LIVES_RWD_ATTR))
-            self.game.points += self._get_reward(HIT_WATER_RWD_ATTR)
+            self.frog.set_dead(self._get_reward(HIT_WATER_RWD_ATTR))
 
     def _occupied(self, position):
         return any([fg.position == position for fg in self.arrived_frogs])
@@ -427,6 +423,7 @@ class Frogger(PyGameWrapper):
         self.frog.set_to_initial_position()
         self.frog.animation_counter = 0
         self.frog.is_moving = False
+        self.frog.log = None
         self.game.points += self.game.level * self._get_reward(FROG_ARRIVED_RWD_ATTR)
 
     def _check_next_level(self):
@@ -464,12 +461,16 @@ class AlphaObject(Object):
 
 
 class Frog(Object):
-    def __init__(self, position, sprite, lives, frog_sprites):
+    def __init__(self, position, sprite, lives, frog_sprites, game, death_rwd):
         super().__init__(position, sprite, ACTION_UP_KEY)
         self.frog_sprites = frog_sprites
         self.lives = lives
+        self.game = game
+        self.no_lives_rwd = death_rwd
+
         self.animation_counter = 0
         self.is_moving = False
+        self.log = None
         self.init_position = position.copy()
 
     def update_sprite(self, key_pressed):
@@ -479,9 +480,15 @@ class Frog(Object):
         self.sprite = self.frog_sprites[key_pressed]
 
     def move(self, key_pressed):
+
+        # checks log, update horizontal movement
+        if self.log is not None:
+            self.position[0] += self.game.speed if self.log.way == ACTION_RIGHT_KEY else -self.game.speed
+
         if not self.is_moving:
             return
 
+        # checks pressed key, move in corresponding direction
         if key_pressed == ACTION_UP_KEY and self.position[1] >= MIN_Y_POS:
             self.position[1] -= 9 if self.animation_counter == ANIMATIONS_PER_MOVE - 1 else 10
         elif key_pressed == ACTION_DOWN_KEY and self.position[1] <= MAX_Y_POS:
@@ -500,20 +507,23 @@ class Frog(Object):
         if self.animation_counter == ANIMATIONS_PER_MOVE:
             self.animation_counter = 0
             self.is_moving = False
+            self.log = None
 
-    def set_dead(self, game, no_lives_rwd):
+    def set_dead(self, death_rwd):
         self.lives -= 1
+        self.game.points += death_rwd
 
         # checks no more lives, adds reward
         if self.lives == 0:
-            game.points += no_lives_rwd
+            self.game.points += self.no_lives_rwd
             return
 
         # otherwise reset frog
-        game.reset_steps()
+        self.game.reset_steps()
         self.set_to_initial_position()
         self.animation_counter = 0
         self.is_moving = False
+        self.log = None
 
     def set_to_initial_position(self):
         self.position = self.init_position.copy()
