@@ -6,7 +6,27 @@ An extension to [jgubert](https://github.com/jgubert/)'s Python frogger game tha
 
 This extension allows frogger to be treated as a *Reinforcement Learning* problem and solved using any standard algorithm.
 
-Tested with *Python 3.5* (*gym v0.10.9* and *pygame v1.9.4*)
+Tested with *Python 3.5* (*pygame v1.9.4*, *ple 0.0.1* and *gym v0.10.9*)
+
+# Dependencies
+
+- [Pygame](https://www.pygame.org/wiki/GettingStarted)
+
+  ```bash
+  pip install Pygame
+  ```
+
+- [Pygame Learning Environment](https://github.com/ntasfi/PyGame-Learning-Environment)
+
+  ```bash
+  pip install -e git+https://github.com/ntasfi/PyGame-Learning-Environment.git
+  ```
+
+- [OpenAI Gym](https://github.com/openai/gym)
+
+  ```bash
+  pip install gym
+  ```
 
 # Task Description
 

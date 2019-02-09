@@ -23,7 +23,7 @@ register(
     id=GAME_GYM_ID,
     kwargs={MAX_STEPS_ATTR: NAX_STEPS, LIVES_ATTR: DEFAULT_LIVES, ACTIONS_ATTR: ACTIONS,
             NUM_ARRIVED_FROGS_ATTR: NUM_ARRIVED_FROGS, FORCE_FPS_ATTR: True, FPS_ATTR: 20, DISPLAY_SCREEN_ATTR: True,
-            SOUND_ATTR: False},
+            SOUND_ATTR: True},
     entry_point=FROGGER_ENTRY_POINT_STR,
     tags={MAX_EPISODE_STEPS_ATTR: NAX_STEPS * DEFAULT_LIVES},
     nondeterministic=False,
