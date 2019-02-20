@@ -160,7 +160,7 @@ class Frogger(PyGameWrapper):
         # checks max moves
         if self.game.steps == 0:
             self._set_death_sprite(self.sprites_time_up)
-            self.frog.set_dead(self._get_reward(TIME_UP_RWD_ATTR))
+            self.frog.set_dead(self._get_reward(TIME_UP_RWD_ATTR), TIME_UP_DEATH_IDX)
 
         self._create_cars()
         self._create_logs()
@@ -234,6 +234,7 @@ class Frogger(PyGameWrapper):
         self.process_events = True
         self.game.steps -= 1
         self.game.points += self._get_reward(TICK_RWD_ATTR)
+        self.game.death_idx = NOT_DEAD_IDX
 
     def _get_reward(self, rwd_attr):
         return self.rewards[rwd_attr] if rwd_attr in self.rewards else 0.
@@ -354,7 +355,7 @@ class Frogger(PyGameWrapper):
                 if self.sound:
                     self.hit_sound.play()
                 self._set_death_sprite(self.sprites_crash)
-                self.frog.set_dead(self._get_reward(HIT_CAR_RWD_ATTR))
+                self.frog.set_dead(self._get_reward(HIT_CAR_RWD_ATTR), CAR_DEATH_IDX)
                 break
 
     def _frog_in_the_river(self):
@@ -381,7 +382,7 @@ class Frogger(PyGameWrapper):
             if self.sound:
                 self.water_sound.play()
             self._set_death_sprite(self.sprites_drowned)
-            self.frog.set_dead(self._get_reward(HIT_WATER_RWD_ATTR))
+            self.frog.set_dead(self._get_reward(HIT_WATER_RWD_ATTR), WATER_DEATH_IDX)
 
     def _occupied(self, position):
         return any([fg.position == position for fg in self.arrived_frogs])
@@ -509,9 +510,10 @@ class Frog(Object):
             self.is_moving = False
             self.log = None
 
-    def set_dead(self, death_rwd):
+    def set_dead(self, death_rwd, death_idx):
         self.lives -= 1
         self.game.points += death_rwd
+        self.game.death_idx = death_idx
 
         # checks no more lives, adds reward
         if self.lives == 0:
@@ -565,7 +567,7 @@ class Game(object):
         self.level = level
         self.points = 0
         self.steps = self.max_steps = max_steps
-        self.gameInit = 0
+        self.death_idx = NOT_DEAD_IDX
 
     def reset_steps(self):
         self.steps = self.max_steps

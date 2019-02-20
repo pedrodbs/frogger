@@ -43,6 +43,11 @@ NEW_LEVEL_RWD_ATTR = 'level-rwd'
 FROG_ARRIVED_RWD_ATTR = 'frog-arrived-rwd'
 TICK_RWD_ATTR = 'tick-rwd'
 
+NOT_DEAD_IDX = 0
+WATER_DEATH_IDX = 1
+CAR_DEATH_IDX = 2
+TIME_UP_DEATH_IDX = 3
+
 OBS_SEPARATOR = 9876.54321
 
 
@@ -58,6 +63,7 @@ class FroggerState(object):
         self.steps = 0
         self.level = 0
         self.points = 0.
+        self.death_idx = 0
         self.lives = 0
         self.arrived_frogs = [False] * len(ARRIVAL_POSITIONS)
         self.frog_info = []
@@ -79,6 +85,7 @@ class FroggerState(object):
         game_state.steps = game.steps
         game_state.level = game.level
         game_state.points = game.points
+        game_state.death_idx = game.death_idx
         game_state.lives = frog.lives
 
         # checks frog arrived indexes
@@ -108,12 +115,13 @@ class FroggerState(object):
         game_state.steps = int(obs[0])
         game_state.level = int(obs[1])
         game_state.points = obs[2].item()
-        game_state.lives = max(0, int(obs[3]))
-        game_state.arrived_frogs = obs[4:9].astype(bool).tolist()
-        game_state.frog_info = obs[9:14].tolist()
+        game_state.death_idx = int(obs[3])
+        game_state.lives = max(0, int(obs[4]))
+        game_state.arrived_frogs = obs[5:10].astype(bool).tolist()
+        game_state.frog_info = obs[10:15].tolist()
 
         # reads cars until reaching separator
-        idx = 14
+        idx = 15
         info_size = 5
         while True:
             if obs[idx] == OBS_SEPARATOR:
@@ -137,6 +145,7 @@ class FroggerState(object):
         obs_list = [self.steps,
                     self.level,
                     self.points,
+                    self.death_idx,
                     self.lives]
 
         obs_list.extend(np.array(self.arrived_frogs, dtype=int))
