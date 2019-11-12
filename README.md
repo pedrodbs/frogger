@@ -1,12 +1,17 @@
 # frogger
 
 <p style="text-align:center;"><img src="frogger.png" alt="Frogger" width="300" /></p>
-
 An extension to [jgubert](https://github.com/jgubert/)'s Python frogger game that can be integrated with [OpenAI's Gym](https://gym.openai.com/) (Gym) via [PyGame Learning Environment](https://github.com/ntasfi/PyGame-Learning-Environment) (PLE). 
 
-This extension allows frogger to be treated as a *Reinforcement Learning* problem and solved using any standard algorithm.
+This extension allows Frogger to be treated as a *Reinforcement Learning* problem and solved using any standard algorithm.
 
 Tested with *Python 3.5* (*pygame v1.9.4*, *ple 0.0.1* and *gym v0.10.9*)
+
+# Installation
+
+```python
+pip install -e git+https://github.com/pedrodbs/frogger.git
+```
 
 # Dependencies
 
@@ -18,7 +23,7 @@ Tested with *Python 3.5* (*pygame v1.9.4*, *ple 0.0.1* and *gym v0.10.9*)
 
 - [Pygame Learning Environment](https://github.com/ntasfi/PyGame-Learning-Environment)
 
-  ```bash
+  ```python
   pip install -e git+https://github.com/ntasfi/PyGame-Learning-Environment.git
   ```
 

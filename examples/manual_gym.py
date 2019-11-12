@@ -51,7 +51,7 @@ if __name__ == '__main__':
 
     env = Monitor(env, directory=out_dir, force=True, video_callable=lambda _: True)
     env.seed(0)
-    env.env.env.monitor = env
+    env.env.monitor = env
 
     action_set = list(ACTIONS.values())
     action_names = list(ACTIONS.keys())
