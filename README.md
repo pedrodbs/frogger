@@ -7,6 +7,23 @@ This extension allows Frogger to be treated as a *Reinforcement Learning* proble
 
 Tested with *Python 3.5* (*pygame v1.9.4*, *ple 0.0.1* and *gym v0.10.9*)
 
+Please cite this repository if you use the code in your research:
+```
+@software{pedro_sequeira_2020_3637654,
+  author       = {Pedro Sequeira and
+                  João Gubert},
+  title        = {Frogger python implementation},
+  month        = feb,
+  year         = 2020,
+  publisher    = {Zenodo},
+  version      = {v1.0.0},
+  doi          = {10.5281/zenodo.3637654},
+  url          = {https://doi.org/10.5281/zenodo.3637654}
+}
+```
+
+[![DOI](https://zenodo.org/badge/166153990.svg)](https://zenodo.org/badge/latestdoi/166153990)
+
 # Installation
 
 ```python
